@@ -44,7 +44,7 @@ Tax is entered once (auto-filled from the receipt scan if available) and distrib
 ### Install and run
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/bill-split.git
+git clone https://github.com/CodyGargar/bill-split.git
 cd bill-split
 npm install
 npm run dev
