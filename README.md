@@ -12,7 +12,7 @@ A fast, mobile-friendly web app for splitting grocery bills — built for real-w
 Type in everyone who went on the trip. Each person gets a unique color that carries through the whole app so you can track who's who at a glance.
 
 ### 2. Import items — three ways
-- **Scan a receipt** — take a photo or upload one. Claude AI (vision) reads the receipt and auto-populates every line item with name and price. Works on Costco receipts, grocery store thermal paper, screenshots, etc.
+- **Scan a receipt** — take a photo or upload one. Claude reads the receipt and auto-populates every line item with name and price. Works on Costco receipts, grocery store thermal paper, screenshots, etc.
 - **Paste a list** — copy from your Notes app, a spreadsheet, or anywhere. One item per line in the format `Item name $price`. The app recognizes the prices and imports everything at once.
 - **Add manually** — type items one at a time with a name and price field.
 
@@ -39,7 +39,7 @@ Tax is entered once (auto-filled from the receipt scan if available) and distrib
 
 ### Requirements
 - [Node.js](https://nodejs.org) v18 or later
-- An [Anthropic API key](https://console.anthropic.com) (only needed for receipt scanning — the rest works without it)
+- [Claude Code](https://claude.com/claude-code) installed and logged in (`claude` on your PATH) — only needed for receipt scanning, the rest works without it. Receipt scanning uses your existing Claude subscription via the CLI, not a separate API key.
 
 ### Install and run
 
@@ -65,9 +65,11 @@ Then open `http://<your-pc-ip>:5173` on your phone. The camera upload button wil
 
 ### Receipt scanning setup
 
-The first time you tap **Scan Receipt**, the app asks for your Anthropic API key. It's saved in your browser's localStorage and only ever sent to the local Express server running on your own machine — never to any external service.
+Receipt scanning shells out to the **Claude CLI** on your machine — it uses whatever account you're logged into Claude Code with (subscription or API key), so there's nothing to configure in the app itself. Make sure you've run `claude` at least once and are logged in before scanning a receipt.
 
-Get a key at [console.anthropic.com](https://console.anthropic.com).
+Because this runs against your own Claude account, the server applies a small rate limit (default: 5 scans per minute, configurable via `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` env vars) to guard against accidental runaway usage — e.g. double-clicks or retry bugs burning through your usage.
+
+This design means the app **only works when you're running the local server on your own machine** — it can't be deployed to a static host like GitHub Pages, since it needs to invoke a CLI tool with your local login.
 
 ---
 
@@ -88,7 +90,7 @@ This compiles the React app into `dist/` and serves it from the Express server a
 
 ```
 bill-split/
-├── server.js              # Express server — serves static files + Claude API proxy
+├── server.js              # Express server — serves static files + shells out to the Claude CLI
 ├── vite.config.js         # Vite config with /api proxy to Express in dev
 ├── src/
 │   ├── App.jsx            # Root component, state, step navigation
@@ -108,8 +110,8 @@ bill-split/
 
 - **React 18** — UI
 - **Vite** — dev server and build
-- **Express** — local API server (Claude proxy, static file serving in production)
-- **Claude claude-sonnet-4-6** (Anthropic) — receipt image parsing via vision API
+- **Express** — local API server (invokes the Claude CLI, static file serving in production)
+- **Claude Code CLI** — receipt image parsing, run locally against your own Claude login (model configurable via `CLAUDE_MODEL`, defaults to `sonnet`)
 
 ---
 

@@ -11,17 +11,11 @@ export default function App() {
   const [people, setPeople] = useState([])
   const [items, setItems] = useState([])
   const [tax, setTax] = useState('')
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('bs_api_key') || '')
 
   const summary = useMemo(
     () => calcSummary(people, items, parseFloat(tax) || 0),
     [people, items, tax]
   )
-
-  const saveApiKey = (key) => {
-    setApiKey(key)
-    localStorage.setItem('bs_api_key', key)
-  }
 
   const subtotal = items.reduce((s, i) => s + (parseFloat(i.price) || 0), 0)
   const total = subtotal + (parseFloat(tax) || 0)
@@ -65,8 +59,6 @@ export default function App() {
             people={people}
             tax={tax}
             setTax={setTax}
-            apiKey={apiKey}
-            setApiKey={saveApiKey}
             onNext={() => setStep(2)}
             onBack={() => setStep(0)}
           />

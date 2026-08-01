@@ -17,13 +17,11 @@ function parsePastedItems(text) {
     })
 }
 
-export default function ItemsStep({ items, setItems, people, tax, setTax, apiKey, setApiKey, onNext, onBack }) {
+export default function ItemsStep({ items, setItems, people, tax, setTax, onNext, onBack }) {
   const [parsing, setParsing] = useState(false)
   const [parseError, setParseError] = useState('')
-  const [showApiKey, setShowApiKey] = useState(false)
   const [showPaste, setShowPaste] = useState(false)
   const [pasteText, setPasteText] = useState('')
-  const [pendingFile, setPendingFile] = useState(null)
   const [newName, setNewName] = useState('')
   const [newPrice, setNewPrice] = useState('')
   const fileRef = useRef()
@@ -33,15 +31,10 @@ export default function ItemsStep({ items, setItems, people, tax, setTax, apiKey
 
   const handleFile = (file) => {
     if (!file) return
-    if (!apiKey) {
-      setPendingFile(file)
-      setShowApiKey(true)
-      return
-    }
-    doParseReceipt(file, apiKey)
+    doParseReceipt(file)
   }
 
-  const doParseReceipt = async (file, key) => {
+  const doParseReceipt = async (file) => {
     setParsing(true)
     setParseError('')
 
@@ -51,7 +44,7 @@ export default function ItemsStep({ items, setItems, people, tax, setTax, apiKey
         const base64 = reader.result.split(',')[1]
         const res = await fetch('/api/parse-receipt', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': key },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageData: base64, mediaType: file.type || 'image/jpeg' })
         })
         const data = await res.json()
@@ -102,37 +95,6 @@ export default function ItemsStep({ items, setItems, people, tax, setTax, apiKey
 
   return (
     <div className="step-content">
-      {showApiKey && (
-        <div className="modal-overlay" onClick={() => setShowApiKey(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3>Anthropic API Key</h3>
-            <p>Receipt scanning uses Claude AI vision. Enter your API key — it's saved locally in your browser and only sent to your local server.</p>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              placeholder="sk-ant-..."
-              className="input"
-              autoFocus
-            />
-            <p className="hint-text">Get a key at <strong>console.anthropic.com</strong></p>
-            <div className="modal-actions">
-              <button onClick={() => { setShowApiKey(false); setPendingFile(null) }} className="btn">Cancel</button>
-              <button
-                onClick={() => {
-                  setShowApiKey(false)
-                  if (pendingFile) { doParseReceipt(pendingFile, apiKey); setPendingFile(null) }
-                }}
-                className="btn btn-primary"
-                disabled={!apiKey.trim()}
-              >
-                Save & Scan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showPaste && (
         <div className="modal-overlay" onClick={() => setShowPaste(false)}>
           <div className="modal modal-tall" onClick={e => e.stopPropagation()}>
@@ -183,7 +145,7 @@ export default function ItemsStep({ items, setItems, people, tax, setTax, apiKey
           {parsing ? (
             <div className="upload-zone parsing">
               <div className="spinner" />
-              <p className="upload-label">Scanning receipt with Claude AI…</p>
+              <p className="upload-label">Scanning receipt with Claude…</p>
             </div>
           ) : (
             <label htmlFor="receipt-upload" className="upload-zone upload-zone-half">
@@ -292,10 +254,6 @@ export default function ItemsStep({ items, setItems, people, tax, setTax, apiKey
           See Summary →
         </button>
       </div>
-
-      <button onClick={() => setShowApiKey(true)} className="api-key-btn" title="Configure API key for receipt scanning">
-        🔑 {apiKey ? 'API key set' : 'Set API key'}
-      </button>
     </div>
   )
 }
