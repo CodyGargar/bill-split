@@ -9,6 +9,7 @@ export default function SummaryStep({ people, items, tax, summary, onBack }) {
   const { personSubtotals, personTax, personTotals, grandTotal } = summary
   const [payerId, setPayerId] = useState('')
   const [copied, setCopied] = useState('')
+  const [copyFallbackText, setCopyFallbackText] = useState('')
 
   const itemsForPerson = (personId) =>
     items.flatMap(item => {
@@ -19,10 +20,28 @@ export default function SummaryStep({ people, items, tax, summary, onBack }) {
 
   const copyText = async (text, key) => {
     try {
-      await navigator.clipboard.writeText(text)
+      // navigator.clipboard needs a secure context (HTTPS or localhost) —
+      // it's undefined over plain http://<lan-ip>, e.g. from a phone.
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = text
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(textarea)
+        if (!ok) throw new Error('Copy command was blocked by the browser.')
+      }
       setCopied(key)
       setTimeout(() => setCopied(''), 2500)
-    } catch { /* clipboard unavailable */ }
+    } catch {
+      // Neither copy method worked — fall back to showing selectable text.
+      setCopyFallbackText(text)
+    }
   }
 
   const buildSimple = () => {
@@ -71,6 +90,26 @@ export default function SummaryStep({ people, items, tax, summary, onBack }) {
 
   return (
     <div className="step-content">
+      {copyFallbackText && (
+        <div className="modal-overlay" onClick={() => setCopyFallbackText('')}>
+          <div className="modal modal-tall" onClick={e => e.stopPropagation()}>
+            <h3>Copy manually</h3>
+            <p>Automatic copy isn't available here. Tap the text below, select all, and copy.</p>
+            <textarea
+              value={copyFallbackText}
+              readOnly
+              className="input paste-textarea"
+              rows={10}
+              autoFocus
+              onFocus={e => e.target.select()}
+            />
+            <div className="modal-actions">
+              <button onClick={() => setCopyFallbackText('')} className="btn btn-primary">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="step-header">
         <h2>Summary</h2>
       </div>
