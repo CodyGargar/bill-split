@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { uid } from '../utils/id.js'
 
 const AVATAR_COLORS = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#16a34a', '#0891b2']
 
@@ -9,7 +10,7 @@ export default function PeopleStep({ people, setPeople, onNext }) {
     const trimmed = name.trim()
     if (!trimmed || people.some(p => p.name.toLowerCase() === trimmed.toLowerCase())) return
     setPeople(prev => [...prev, {
-      id: crypto.randomUUID(),
+      id: uid(),
       name: trimmed,
       color: AVATAR_COLORS[prev.length % AVATAR_COLORS.length]
     }])

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import ItemCard from './ItemCard.jsx'
+import { uid } from '../utils/id.js'
 
 function parsePastedItems(text) {
   return text
@@ -13,7 +14,7 @@ function parsePastedItems(text) {
       const name = m[1].replace(/\|/g, '').trim()
       const price = parseFloat(m[2].replace(',', ''))
       if (!name || isNaN(price) || price <= 0) return []
-      return [{ id: crypto.randomUUID(), name, price, quantity: 1, assignedTo: 'everyone' }]
+      return [{ id: uid(), name, price, quantity: 1, assignedTo: 'everyone' }]
     })
 }
 
@@ -51,7 +52,7 @@ export default function ItemsStep({ items, setItems, people, tax, setTax, onNext
         if (!res.ok) throw new Error(data.error || 'Failed to parse receipt')
 
         const parsed = (data.items || []).map(item => ({
-          id: crypto.randomUUID(),
+          id: uid(),
           name: item.name || 'Unknown item',
           price: parseFloat(item.price) || 0,
           quantity: item.quantity || 1,
@@ -82,7 +83,7 @@ export default function ItemsStep({ items, setItems, people, tax, setTax, onNext
     const name = newName.trim()
     const price = parseFloat(newPrice)
     if (!name || isNaN(price) || price < 0) return
-    setItems(prev => [...prev, { id: crypto.randomUUID(), name, price, quantity: 1, assignedTo: 'everyone' }])
+    setItems(prev => [...prev, { id: uid(), name, price, quantity: 1, assignedTo: 'everyone' }])
     setNewName('')
     setNewPrice('')
   }
