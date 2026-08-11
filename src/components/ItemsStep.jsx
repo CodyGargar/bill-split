@@ -2,6 +2,36 @@ import { useState, useRef } from 'react'
 import ItemCard from './ItemCard.jsx'
 import { uid } from '../utils/id.js'
 
+// Phone camera photos can be huge (multi-MB, sometimes HEIC) and slow to
+// upload/scan. Downscale to a JPEG before sending — this also normalizes
+// HEIC to JPEG, since Safari can decode HEIC into a canvas even though the
+// vision model can't read it directly.
+function resizeImageFile(file, maxDim = 1600, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height)
+        width = Math.round(width * scale)
+        height = Math.round(height * scale)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', quality).split(',')[1])
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Could not read this image. Try a different photo.'))
+    }
+    img.src = url
+  })
+}
+
 function parsePastedItems(text) {
   return text
     .split('\n')
@@ -39,36 +69,37 @@ export default function ItemsStep({ items, setItems, people, tax, setTax, onNext
     setParsing(true)
     setParseError('')
 
-    const reader = new FileReader()
-    reader.onload = async () => {
-      try {
-        const base64 = reader.result.split(',')[1]
-        const res = await fetch('/api/parse-receipt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageData: base64, mediaType: file.type || 'image/jpeg' })
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Failed to parse receipt')
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60_000)
 
-        const parsed = (data.items || []).map(item => ({
-          id: uid(),
-          name: item.name || 'Unknown item',
-          price: parseFloat(item.price) || 0,
-          quantity: item.quantity || 1,
-          assignedTo: 'everyone'
-        }))
+    try {
+      const base64 = await resizeImageFile(file)
+      const res = await fetch('/api/parse-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageData: base64, mediaType: 'image/jpeg' }),
+        signal: controller.signal
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to parse receipt')
 
-        setItems(prev => [...prev, ...parsed])
-        if (data.tax != null) setTax(data.tax.toFixed(2))
-      } catch (err) {
-        setParseError(err.message)
-      } finally {
-        setParsing(false)
-        if (fileRef.current) fileRef.current.value = ''
-      }
+      const parsed = (data.items || []).map(item => ({
+        id: uid(),
+        name: item.name || 'Unknown item',
+        price: parseFloat(item.price) || 0,
+        quantity: item.quantity || 1,
+        assignedTo: 'everyone'
+      }))
+
+      setItems(prev => [...prev, ...parsed])
+      if (data.tax != null) setTax(data.tax.toFixed(2))
+    } catch (err) {
+      setParseError(err.name === 'AbortError' ? 'Scan timed out after 60s. Try again or a clearer photo.' : err.message)
+    } finally {
+      clearTimeout(timeoutId)
+      setParsing(false)
+      if (fileRef.current) fileRef.current.value = ''
     }
-    reader.readAsDataURL(file)
   }
 
   const importPasted = () => {

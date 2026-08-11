@@ -66,6 +66,8 @@ function rateLimiter(req, res, next) {
 // Runs the local `claude` CLI in print/non-interactive mode, scoped to only
 // the Read tool, with cwd set to an isolated temp directory so the model can
 // see the one receipt image and nothing else from the project.
+const CLI_TIMEOUT_MS = Number(process.env.CLAUDE_CLI_TIMEOUT_MS || 90_000)
+
 function runClaudeCLI(prompt, cwd) {
   return new Promise((resolve, reject) => {
     const child = spawn('claude', [
@@ -79,10 +81,27 @@ function runClaudeCLI(prompt, cwd) {
 
     let stdout = ''
     let stderr = ''
+    let settled = false
+
+    const timer = setTimeout(() => {
+      settled = true
+      // shell:true means child.pid is cmd.exe's PID on Windows, not claude's —
+      // kill the whole tree so the underlying process doesn't keep running.
+      if (process.platform === 'win32') {
+        spawn('taskkill', ['/pid', child.pid, '/t', '/f'])
+      } else {
+        child.kill('SIGKILL')
+      }
+      reject(new Error(`Claude CLI timed out after ${Math.round(CLI_TIMEOUT_MS / 1000)}s.`))
+    }, CLI_TIMEOUT_MS)
+
     child.stdout.on('data', d => { stdout += d })
     child.stderr.on('data', d => { stderr += d })
 
     child.on('error', err => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
       if (err.code === 'ENOENT') {
         reject(new Error('Claude CLI not found. Install it and run `claude` once to log in with your subscription.'))
       } else {
@@ -91,6 +110,9 @@ function runClaudeCLI(prompt, cwd) {
     })
 
     child.on('close', code => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
       if (code !== 0) {
         return reject(new Error(stderr.trim() || `Claude CLI exited with code ${code}`))
       }
